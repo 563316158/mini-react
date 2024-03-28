@@ -10,11 +10,12 @@ function CounterContainer() {
   );
 }
 
-
 let count = 0;
+let props = { id: 1111 };
 function Counter() {
   const handleClick = () => {
     console.log("click");
+    props = {};
     count++;
     React.update();
   };
@@ -22,7 +23,7 @@ function Counter() {
   console.log("Counter", count);
 
   return (
-    <div>
+    <div {...props}>
       Counter: {count}
       <button onClick={handleClick}>click</button>
     </div>
@@ -45,6 +46,5 @@ function App() {
 }
 
 console.log("App", <App />);
-
 
 export default App;

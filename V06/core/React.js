@@ -24,6 +24,7 @@ const createElementText = (nodeValue) => {
 let wipRoot = null;
 let currentRoot = null;
 let deletions = [];
+let wipFiber = null;
 const render = (App, container) => {
   wipRoot = {
     dom: container,
@@ -39,6 +40,12 @@ function workLoop(idleDeadline) {
 
   while (!shouldYield && nextWorkUnit) {
     nextWorkUnit = performWorkOfUnit(nextWorkUnit);
+
+    if (wipRoot?.sibling?.type === nextWorkUnit?.type) {
+      console.log("wipRoot", wipRoot);
+      nextWorkUnit = null;
+    }
+
     shouldYield = idleDeadline.timeRemaining() < 1;
   }
 
@@ -87,9 +94,11 @@ function initChildren(fiber, children) {
   let oldFiber = fiber.alternate?.child;
   let preChild = null;
 
-  // console.log("children", children);
-
   children?.forEach((child, index) => {
+    // 当 child 是false 的时候 判断写在这里可不？目前没有发现什么情况有问题 先写在 约到问题具体解决 老师不是写在这里
+    if (!child) {
+      return;
+    }
     const isSameType = oldFiber && oldFiber.type === child.type;
     let nextFiber = null;
     if (isSameType) {
@@ -113,10 +122,8 @@ function initChildren(fiber, children) {
         parent: fiber,
         child: null,
         sibling: null,
-        effectTag: "create",
+        effectTag: "placement",
       };
-
-      // console.log("oldFiber1", oldFiber);
 
       if (oldFiber) {
         deletions.push(oldFiber);
@@ -135,9 +142,10 @@ function initChildren(fiber, children) {
     preChild = nextFiber;
   });
 
-  console.log("oldFiber2", oldFiber);
-
-  console.log("deletions", deletions);
+  while (oldFiber) {
+    deletions.push(oldFiber);
+    oldFiber = oldFiber.sibling;
+  }
 }
 
 function commitRoot() {
@@ -158,15 +166,6 @@ function commitDeletion(fiber) {
       domParent = domParent?.parent;
     }
     domParent.dom?.removeChild(fiber.dom);
-
-    // let nextFiber = fiber;
-    // while (nextFiber) {
-    //   if (nextFiber.parent?.dom) {
-    //     nextFiber.parent?.dom?.removeChild(fiber.dom);
-    //     break;
-    //   }
-    //   nextFiber = nextFiber.parent;
-    // }
   } else {
     commitDeletion(fiber.child);
   }
@@ -180,7 +179,7 @@ function commitWork(fiber) {
     domParent = domParent?.parent;
   }
 
-  if (fiber.effectTag === "create") {
+  if (fiber.effectTag === "placement") {
     fiber.dom && domParent.dom.append(fiber.dom);
   } else if (fiber.effectTag === "update") {
     updateProps(fiber.dom, fiber.props, fiber.alternate?.props);
@@ -191,7 +190,7 @@ function commitWork(fiber) {
 }
 
 function updateFunctionComponent(fiber) {
-  console.log("fiber.type", fiber.type);
+  wipFiber = fiber;
   const children = [fiber.type(fiber.props)];
   // 3、 转化为链表
   initChildren(fiber, children);
@@ -230,13 +229,20 @@ function performWorkOfUnit(fiber) {
 requestIdleCallback(workLoop);
 
 const update = () => {
-  wipRoot = {
-    dom: currentRoot.dom,
-    props: currentRoot.props,
-    alternate: currentRoot,
-  };
+  // let wipFiber = nextWorkUnit;
 
-  nextWorkUnit = wipRoot;
+  // console.log("nextWorkUnit1", nextWorkUnit);
+
+  const currentFiber = wipFiber;
+
+  return () => {
+    wipRoot = {
+      ...currentFiber,
+      alternate: currentFiber,
+    };
+    nextWorkUnit = wipRoot;
+    console.log("nextWorkUnit2", nextWorkUnit);
+  };
 };
 
 const React = {

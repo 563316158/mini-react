@@ -1,28 +1,58 @@
 import React from "./core/React.js";
 
-let show = false;
-function Counter() {
-  const foo = (
+let fooCount = 0;
+function Foo() {
+  const callBack = React.update();
+  const handleClick = () => {
+    console.log("click Foo");
+    fooCount++;
+    callBack();
+  };
+
+  console.log("Foo");
+  return (
     <div>
-      Foo<div>Child</div>
+      Foo:{fooCount}
+      <button onClick={handleClick}>click</button>
     </div>
   );
+}
 
+let barCount = 0;
+function Bar() {
+  const callBack = React.update();
+  const handleClick = () => {
+    console.log("click Bar");
+    barCount++;
+    callBack();
+  };
 
-    const bar = <p>Bar</p>;
-  
+  console.log("Bar");
+  return (
+    <div>
+      Bar:{barCount}
+      <button onClick={handleClick}>click</button>
+    </div>
+  );
+}
 
+let count = 0;
+function Counter() {
+  const callBack = React.update();
   const handleClick = () => {
     console.log("click");
-    show = !show;
-    React.update();
+    count++;
+    callBack();
   };
+
+  console.log("Counter");
 
   return (
     <div>
-      Counter
+      Counter:{count}
       <button onClick={handleClick}>click</button>
-      <div> {show ? bar : foo}</div>
+      <Foo></Foo>
+      <Bar></Bar>
     </div>
   );
 }

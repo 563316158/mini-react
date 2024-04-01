@@ -189,8 +189,14 @@ function commitWork(fiber) {
 }
 
 function updateFunctionComponent(fiber) {
+  // 初始化 useState
   stateHooks = [];
   stateHooksIndex = 0;
+
+  // 初始化 useEffect
+  effectDeps = [];
+  effectHooksIndex = 0;
+  callBackReturns = [];
   wipFiber = fiber;
   const children = [fiber.type(fiber.props)];
   // 3、 转化为链表
@@ -270,7 +276,54 @@ function useState(initial) {
   return [initialState.state, setState];
 }
 
+let effectDeps = [];
+let callBackReturns = [];
+let effectHooksIndex = 0;
+function useEffect(callback, deps) {
+  const currentFiber = wipFiber;
+  const oldEffectHooks = currentFiber?.alternate?.effectHooks;
+  // debugger;
+  const oldCallBackReturn = oldEffectHooks?.callBackReturns?.[effectHooksIndex];
+
+  let callBackReturn = null;
+
+  if (oldCallBackReturn) {
+    oldCallBackReturn();
+  }
+
+  if (!deps) {
+    callBackReturn = callback();
+  }
+
+  if (deps && deps.length >= 0 && !currentFiber.alternate) {
+    callBackReturn = callback();
+  }
+
+  if (
+    deps &&
+    deps.length > 0 &&
+    oldEffectHooks?.effectDeps?.[effectHooksIndex]?.some((dep, index) => {
+      return dep !== deps[index];
+    })
+  ) {
+
+    callBackReturn = callback();
+  }
+
+  effectDeps.push(deps);
+  callBackReturns.push(callBackReturn);
+  effectHooksIndex++;
+
+  const effectHooks = {
+    effectDeps,
+    callBackReturns,
+  };
+
+  currentFiber.effectHooks = effectHooks;
+}
+
 const React = {
+  useEffect,
   useState,
   render,
   createElement,

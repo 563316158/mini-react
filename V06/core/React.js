@@ -42,7 +42,6 @@ function workLoop(idleDeadline) {
     nextWorkUnit = performWorkOfUnit(nextWorkUnit);
 
     if (wipRoot?.sibling?.type === nextWorkUnit?.type) {
-      console.log("wipRoot", wipRoot);
       nextWorkUnit = null;
     }
 

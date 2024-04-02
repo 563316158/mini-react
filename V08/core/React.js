@@ -151,11 +151,73 @@ function initChildren(fiber, children) {
 function commitRoot() {
   commitWork(wipRoot.child);
 
+  commitEffect();
+
   deletions.forEach(commitDeletion);
 
   wipRoot = null;
 
   deletions = [];
+}
+
+function commitEffect() {
+  function run(fiber) {
+    // debugger;
+    if (!fiber) return;
+
+    if (!fiber?.alternate) {
+      // init
+      fiber?.effectHooks?.forEach((effectHook) => {
+        effectHook.cleanup = effectHook?.callback();
+      });
+    } else {
+      // update
+      const oldFiberEffectHooks = fiber?.alternate?.effectHooks;
+      const newFiberEffectHooks = fiber?.effectHooks;
+
+      oldFiberEffectHooks?.forEach((oldFiberEffectHook, index) => {
+        const newFiberEffectHook = newFiberEffectHooks?.[index];
+
+        const needCallback = oldFiberEffectHook?.deps.some((dep, i) => {
+          return dep !== newFiberEffectHook?.deps[i];
+        });
+
+        needCallback &&
+          (newFiberEffectHook.cleanup = newFiberEffectHook?.callback());
+      });
+    }
+
+    run(fiber?.child);
+    run(fiber?.sibling);
+  }
+  if (wipRoot.alternate) {
+    runCleanups(wipRoot);
+  }
+
+  run(wipRoot);
+
+  function runCleanups(fiber) {
+    if (!fiber) return;
+    const oldFiberEffectHooks = fiber?.alternate?.effectHooks;
+    const newFiberEffectHooks = fiber?.effectHooks;
+
+    oldFiberEffectHooks?.forEach((oldFiberEffectHook, index) => {
+      const newFiberEffectHook = newFiberEffectHooks?.[index];
+
+      const needCallback = oldFiberEffectHook?.deps.some((dep, i) => {
+        return dep !== newFiberEffectHook?.deps[i];
+      });
+
+      needCallback && oldFiberEffectHook?.cleanup?.();
+    });
+
+    // fiber?.alternate?.effectHooks?.forEach((effectHook) => {
+    //   effectHook.cleanup && effectHook?.cleanup();
+    // });
+
+    runCleanups(fiber.child);
+    runCleanups(fiber.sibling);
+  }
 }
 
 function commitDeletion(fiber) {
@@ -194,9 +256,9 @@ function updateFunctionComponent(fiber) {
   stateHooksIndex = 0;
 
   // 初始化 useEffect
-  effectDeps = [];
-  effectHooksIndex = 0;
-  callBackReturns = [];
+  effectHooks = [];
+  effectHookIndex = 0;
+
   wipFiber = fiber;
   const children = [fiber.type(fiber.props)];
   // 3、 转化为链表
@@ -276,48 +338,20 @@ function useState(initial) {
   return [initialState.state, setState];
 }
 
-let effectDeps = [];
-let callBackReturns = [];
-let effectHooksIndex = 0;
+let effectHooks = null;
+let effectHookIndex = 0;
 function useEffect(callback, deps) {
   const currentFiber = wipFiber;
-  const oldEffectHooks = currentFiber?.alternate?.effectHooks;
-  // debugger;
-  const oldCallBackReturn = oldEffectHooks?.callBackReturns?.[effectHooksIndex];
 
-  let callBackReturn = null;
-
-  if (oldCallBackReturn) {
-    oldCallBackReturn();
-  }
-
-  if (!deps) {
-    callBackReturn = callback();
-  }
-
-  if (deps && deps.length >= 0 && !currentFiber.alternate) {
-    callBackReturn = callback();
-  }
-
-  if (
-    deps &&
-    deps.length > 0 &&
-    oldEffectHooks?.effectDeps?.[effectHooksIndex]?.some((dep, index) => {
-      return dep !== deps[index];
-    })
-  ) {
-
-    callBackReturn = callback();
-  }
-
-  effectDeps.push(deps);
-  callBackReturns.push(callBackReturn);
-  effectHooksIndex++;
-
-  const effectHooks = {
-    effectDeps,
-    callBackReturns,
+  const effectHook = {
+    callback,
+    deps,
+    cleanup: currentFiber.alternate
+      ? currentFiber.alternate.effectHooks[effectHookIndex].cleanup
+      : null,
   };
+
+  effectHooks.push(effectHook);
 
   currentFiber.effectHooks = effectHooks;
 }
